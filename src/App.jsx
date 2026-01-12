@@ -57,12 +57,13 @@ function App() {
             const url = `${apiBase}/admin/signin`;
             try {
                 const res = await axios.post(url, formData);
-                // console.log(res);
                 const { token, expired } = res.data;
                 document.cookie = `hexToken=${token};expires=${new Date(
                     expired
                 )};`;
+                axios.defaults.headers.common["Authorization"] = token;
                 setIsAuth(true);
+                apiProduct.get();
             } catch (error) {
                 console.dir(error);
                 setIsAuth(false);
@@ -141,41 +142,69 @@ function App() {
     };
 
     const checkLogin = async () => {
-        console.log("checkLogin cookie:", document.cookie.split("; "));
+        // console.log("checkLogin cookie:", document.cookie.split("; "));
+        // const token = document.cookie
+        //     .split("; ")
+        //     .find((row) => row.startsWith("hexToken="))
+        //     ?.split("=")[1];
+
+        // axios.defaults.headers.common["Authorization"] = token;
+        // try {
+        //     const url = `${apiBase}/api/user/check`;
+        //     const res = await axios.post(url);
+        //     console.log("checkLogin", res);
+        //     if (res.data.success) {
+        //         setIsChecked(true);
+        //         // getProducts();
+        //         apiProduct.get();
+        //     } else {
+        //         setIsChecked(false);
+        //     }
+        // } catch (error) {
+        //     console.dir(error);
+        //     setIsChecked(false);
+        // }
+        await autoCheckLogin();
+    };
+    // const [chosenProduct, setChosenProduct] = useState(null);
+
+    useEffect(() => {
+        // check login
+        autoCheckLogin();
+        // init modal
+        // modal arai-hidden issue
+    }, []);
+
+    const autoCheckLogin = async () => {
         const token = document.cookie
             .split("; ")
             .find((row) => row.startsWith("hexToken="))
             ?.split("=")[1];
+        if (!token) {
+            setIsAuth(false);
+            setIsChecked(false);
+            return;
+        }
 
         axios.defaults.headers.common["Authorization"] = token;
         try {
             const url = `${apiBase}/api/user/check`;
             const res = await axios.post(url);
-            console.log("checkLogin", res);
+            console.log("auto check res", res);
             if (res.data.success) {
                 setIsChecked(true);
-                // getProducts();
+                setIsAuth(true);
                 apiProduct.get();
             } else {
+                setIsAuth(false);
                 setIsChecked(false);
             }
         } catch (error) {
             console.dir(error);
+            setIsAuth(false);
             setIsChecked(false);
         }
     };
-
-    // checkLogin();
-
-    // const [chosenProduct, setChosenProduct] = useState(null);
-
-    // useEffect(() => {
-    //     fetchData("/data.json").then((res) => {
-    //         setProducts(res);
-    //     });
-    // }, []);
-    // console.log("products", products);
-
     // const showDetail = (id) => {
     //     const matchProduct = products.find((item) => item.id === id);
     //     setChosenProduct(matchProduct);
