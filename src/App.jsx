@@ -1,37 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./App.scss";
+import * as bootstrap from "bootstrap";
 
 function App() {
     const apiBase = import.meta.env.VITE_API_BASE;
     const apiPath = "kevin-react";
-    const [formData, setFormData] = useState({
+    const [loginForm, setloginForm] = useState({
         username: "sbdrumer1028@gmail.com",
         password: "kv12345",
     });
     const [isAuth, setIsAuth] = useState(false);
     const [products, setProducts] = useState([]);
-    const [isChecked, setIsChecked] = useState(false);
-    const [inputUrl, setInputUrl] = useState("");
-    const [actType, setactType] = useState(1);
-    const actMethods = [null, "新增", "編輯", "刪除"];
-    const modalAdd = useRef(null);
-    const doInputChange = (e) => {
-        const { name, value } = e.target;
-        console.log("change:", name, value);
-        setFormData((prevData) => ({
-            ...prevData,
-            [name]: value,
-        }));
-    };
-    const modalInputChange = (e) => {
-        const { name, value } = e.target;
-        console.log("change:", name, value);
-        setProductForm((prevData) => ({
-            ...prevData,
-            [name]: value,
-        }));
-    };
+    // const [isChecked, setIsChecked] = useState(false);
+    // const [modalType, setModalType] = useState(1);
+    // const modalMap = [null, "新增", "編輯", "刪除"];
+    const modalLogin = useRef(null);
+    const [modalType, setModalType] = useState("");
+    const modalMap = { create: "新增", edit: "編輯", delete: "刪除" };
+
     const initForm = {
         category: "",
         content: "",
@@ -39,7 +26,7 @@ function App() {
         id: "",
         imageUrl: "",
         imagesUrl: [],
-        is_enabled: 1,
+        is_enabled: 0,
         origin_price: 0,
         price: 0,
         title: "",
@@ -48,22 +35,42 @@ function App() {
     };
     const [productForm, setProductForm] = useState(initForm);
 
-    const handleInputChange = (e) => {
+    const loginInputChange = (e) => {
         const { name, value } = e.target;
-        console.log("handleInputChange name =", name, "v=", value);
+        setloginForm((prevData) => ({
+            ...prevData,
+            [name]: value,
+        }));
     };
+
+    const modalInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        console.log("change", name, value, type, checked);
+        setProductForm((prevData) => ({
+            ...prevData,
+            [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
+        }));
+    };
+
     const apiUser = {
         login: async () => {
             const url = `${apiBase}/admin/signin`;
             try {
-                const res = await axios.post(url, formData);
-                const { token, expired } = res.data;
-                document.cookie = `hexToken=${token};expires=${new Date(
-                    expired
-                )};`;
-                axios.defaults.headers.common["Authorization"] = token;
-                setIsAuth(true);
-                apiProduct.get();
+                const res = await axios.post(url, loginForm);
+                console.log("login res", res);
+                if (res.data.success) {
+                    const { token, expired } = res.data;
+                    document.cookie = `hexToken=${token};expires=${new Date(
+                        expired
+                    )};`;
+                    axios.defaults.headers.common["Authorization"] = token;
+                }
+                // setIsAuth(true);
+                // const response = await apiProduct.get();
+                // console.log(response)
+                // if (response.data.success) {
+                //     setProducts(response.data.products);
+                // }
             } catch (error) {
                 console.dir(error);
                 setIsAuth(false);
@@ -76,11 +83,10 @@ function App() {
         get: async () => {
             const url = `${apiBase}/api/${apiPath}/admin/products`;
             try {
-                const res = await axios.get(url);
-                console.log("get res", res);
-                if (res.data.success) {
-                    setProducts(res.data.products);
-                }
+                return await axios.get(url);
+                // if (res.data.success) {
+                //     setProducts(res.data.products);
+                // }
             } catch (error) {
                 console.dir(error);
             }
@@ -88,176 +94,172 @@ function App() {
         post: async (sendData) => {
             const url = `${apiBase}/api/${apiPath}/admin/product`;
             try {
-                const res = await axios.post(url, sendData);
-                console.log("post res", res);
+                return await axios.post(url, sendData);
                 if (res.data.success) {
-                    apiProduct.get();
                 }
             } catch (error) {
                 console.dir(error);
             }
         },
-        del: async () => {
+        del: async (pId) => {
             const url = `${apiBase}/api/${apiPath}/admin/product/${pId}`;
             try {
-                const res = await axios.get(url);
-                console.log("del res", res);
-                if (res.data.success) {
-                    setProducts(res.data.products);
-                }
+                return await axios.get(url);
             } catch (error) {
                 console.dir(error);
             }
         },
-        put: async () => {
+        put: async (pId) => {
             const url = `${apiBase}/api/${apiPath}/admin/product/${pId}`;
             try {
-                const res = await axios.get(url);
-                console.log("put res", res);
-                if (res.data.success) {
-                    setProducts(res.data.products);
-                }
+                return await axios.get(url);
             } catch (error) {
                 console.dir(error);
             }
         },
     };
-
-    // const getProducts = async () => {
-    //     const url = `${apiBase}/api/${apiPath}/products/all`;
-    //     try {
-    //         const res = await axios.get(url);
-    //         console.log("getProducts", res);
-    //         if (res.data.success) {
-    //             setProducts(res.data.products);
-    //         }
-    //     } catch (error) {
-    //         console.dir(error);
-    //     }
-    // };
 
     const userLogin = async (e) => {
         e.preventDefault();
-        apiUser.login();
+        await apiUser.login();
     };
 
-    const checkLogin = async () => {
-        // console.log("checkLogin cookie:", document.cookie.split("; "));
+    const productModalRef = useRef(null);
+
+    useEffect(() => {
+        // check if login
+        const token = document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("hexToken="))
+            ?.split("=")[1];
+
+        if (token) {
+            axios.defaults.headers.common.Authorization = token;
+        }
+        checkAdmin();
+
+        // init modal
+        if (isAuth) {
+            // modal 放在內層(助教放外層沒差)，需要先登入才能獲取dom
+            const modalElement = document.getElementById("productModal");
+            productModalRef.current = new bootstrap.Modal(modalElement);
+            console.log("modal ref is", productModalRef);
+
+            // modal arai-hidden issue
+            modalElement.addEventListener("hide.bs.modal", () => {
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
+            });
+        }
+    }, [isAuth]);
+
+    const checkAdmin = async () => {
         // const token = document.cookie
         //     .split("; ")
         //     .find((row) => row.startsWith("hexToken="))
         //     ?.split("=")[1];
 
-        // axios.defaults.headers.common["Authorization"] = token;
-        // try {
-        //     const url = `${apiBase}/api/user/check`;
-        //     const res = await axios.post(url);
-        //     console.log("checkLogin", res);
-        //     if (res.data.success) {
-        //         setIsChecked(true);
-        //         // getProducts();
-        //         apiProduct.get();
-        //     } else {
-        //         setIsChecked(false);
-        //     }
-        // } catch (error) {
-        //     console.dir(error);
-        //     setIsChecked(false);
+        // if (!token) {
+        //     setIsAuth(false);
+        //     // setIsChecked(false);
+        //     return;
         // }
-        await autoCheckLogin();
-    };
-    // const [chosenProduct, setChosenProduct] = useState(null);
+        // axios.defaults.headers.common["Authorization"] = token;
 
-    useEffect(() => {
-        // check login
-        autoCheckLogin();
-        // init modal
-        // modal arai-hidden issue
-    }, []);
-
-    const autoCheckLogin = async () => {
-        const token = document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("hexToken="))
-            ?.split("=")[1];
-        if (!token) {
-            setIsAuth(false);
-            setIsChecked(false);
-            return;
-        }
-
-        axios.defaults.headers.common["Authorization"] = token;
         try {
-            const url = `${apiBase}/api/user/check`;
-            const res = await axios.post(url);
-            console.log("auto check res", res);
+            const res = await axios.post(`${apiBase}/api/user/check`);
             if (res.data.success) {
-                setIsChecked(true);
+                // setIsChecked(true);
                 setIsAuth(true);
-                apiProduct.get();
+                const response = await apiProduct.get();
+                console.log(response);
+                if (response.data.success) {
+                    setProducts(response.data.products);
+                }
             } else {
                 setIsAuth(false);
-                setIsChecked(false);
+                // setIsChecked(false);
             }
         } catch (error) {
             console.dir(error);
             setIsAuth(false);
-            setIsChecked(false);
+            // setIsChecked(false);
         }
     };
-    // const showDetail = (id) => {
-    //     const matchProduct = products.find((item) => item.id === id);
-    //     setChosenProduct(matchProduct);
-    //     console.log("chosenProduct", matchProduct);
-    // };
 
-    const concatUrls = () => {
-        setProductForm((prev) => ({
-            ...prev,
-            imagesUrl: [...prev.imagesUrl, inputUrl],
-        }));
-        console.log("concatUrls", productForm.imagesUrl);
-    };
-
-    const createData = () => {
-        console.log("createData");
-        setactType(1);
-        setProductForm(initForm);
-    };
-
-    const editData = (p) => {
-        console.log("editData", p);
-        setactType(2);
-        setProductForm({
-            category: p.category,
-            content: p.content,
-            description: p.description,
-            id: p.id,
-            imageUrl: p.imageUrl,
-            imagesUrl: p.imagesUrl,
-            is_enabled: p.is_enabled,
-            origin_price: p.origin_price,
-            price: p.price,
-            title: p.title,
-            unit: p.unit,
-            num: p.num,
+    const doImageChange = (index, url) => {
+        console.log("doImageChange", index, url);
+        setProductForm((prev) => {
+            const newImages = [...prev.imagesUrl];
+            newImages[index] = url;
+            // 未滿五張就加新的input
+            if (
+                url !== "" &&
+                index === newImages.length - 1 &&
+                newImages.length < 5
+            ) {
+                newImages.push("");
+            }
+            // 2張以上，若有空白的則清除
+            if (
+                newImages.length > 1 &&
+                newImages[newImages.length - 1] === ""
+            ) {
+                newImages.pop();
+            }
+            return { ...prev, imagesUrl: newImages };
         });
     };
 
-    const delData = (p) => {
-        console.log("delData", p);
-        setactType(3);
+    const addImage = (e) => {
+        console.log("addImage", e);
+        setProductForm((prev) => ({
+            ...prev,
+            imagesUrl: [...prev.imagesUrl, ""],
+        }));
+    };
+
+    const removeImage = (e) => {
+        console.log("removeImage", e);
+        setProductForm((prev) => {
+            const newImages = [...prev.imagesUrl];
+            newImages.pop()
+            return {...prev, imagesUrl:newImages}
+        });
+    };
+
+    const openModal = (product, type) => {
+        // 初始化表單
+        console.log("opened", type, product);
+        setModalType(type);
+        if (type === "create") {
+            setProductForm(initForm); // product === {}
+        } else {
+            setProductForm((prev) => ({
+                ...prev,
+                ...product,
+            }));
+        }
+        console.log("opened 2", productForm);
+        productModalRef.current.show();
+    };
+
+    const closeModal = () => {
+        productModalRef.current.hide();
+        setProductForm(initForm);
     };
 
     const submitModal = async () => {
-        console.log("submitModal", actType, productForm);
-        if (actType === 1) {
+        console.log("submitModal", modalType, productForm);
+        return;
+        if (modalType === "create") {
             // create
             apiProduct.post();
-        } else if (actType === 2) {
+        } else if (modalType === "edit") {
             // edit
-            apiProduct.put();
-        } else if (actType === 3) {
+            apiProduct.put(p.id);
+        } else if (modalType === "delete") {
             // del
             apiProduct.delete();
         }
@@ -270,7 +272,7 @@ function App() {
                     <h1>Week 3 Homework</h1>
                     <h2>Login</h2>
                     <form
-                        ref={modalAdd}
+                        ref={modalLogin}
                         className="border p-4 bg-light rounded col-6 offset-3"
                         onSubmit={userLogin}
                     >
@@ -284,8 +286,8 @@ function App() {
                                 id="username"
                                 name="username"
                                 aria-describedby="emailHelp"
-                                value={formData.username}
-                                onChange={(e) => doInputChange(e)}
+                                value={loginForm.username}
+                                onChange={(e) => loginInputChange(e)}
                             />
                         </div>
                         <div className="mb-3 text-start">
@@ -297,8 +299,8 @@ function App() {
                                 className="form-control"
                                 id="password"
                                 name="password"
-                                value={formData.password}
-                                onChange={(e) => doInputChange(e)}
+                                value={loginForm.password}
+                                onChange={(e) => loginInputChange(e)}
                             />
                         </div>
                         <button type="submit" className="btn btn-primary">
@@ -307,82 +309,77 @@ function App() {
                     </form>
                 </div>
             ) : (
-                <div className="container">
-                    <div className="row border">
-                        <div className="col-12 pt-3">
-                            <button className="mb-3" onClick={checkLogin}>
-                                Check Login first, than download products
+                <div className="row border">
+                    <div className="col-12">
+                        <h2>Items on Shelf</h2>
+                        <div className="text-start ms-3 mt-4">
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => openModal({}, "create")}
+                            >
+                                建立新產品
                             </button>
                         </div>
-                        <div className="col-12">
-                            <h2>Items on Shelf</h2>
-                            <div className="text-start ms-3 mt-4">
-                                <button
-                                    className="btn btn-primary"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#productModal"
-                                    onClick={() => createData()}
-                                >
-                                    建立新的產品
-                                </button>
-                            </div>
-                            <table className="table table-responsive table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Category</th>
-                                        <th>O.Price</th>
-                                        <th>Sale</th>
-                                        <th>Active</th>
-                                        <th>Detail</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {products.map((p) => (
-                                        <tr key={p.id}>
-                                            <td>{p.title}</td>
-                                            <td>{p.category}</td>
-                                            <td>{p.origin_price}</td>
-                                            <td>{p.price}</td>
-                                            <td>
-                                                {p.is_enabled ? "yes" : "no"}
-                                            </td>
-                                            <td>
+                        <table className="table table-responsive table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th>O.Price</th>
+                                    <th>Sale</th>
+                                    <th>Active</th>
+                                    <th>Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {products.map((p) => (
+                                    <tr key={p.id}>
+                                        <td>{p.title}</td>
+                                        <td>{p.category}</td>
+                                        <td>{p.origin_price}</td>
+                                        <td>{p.price}</td>
+                                        <td>
+                                            <span
+                                                className={`${
+                                                    p.is_enabled &&
+                                                    "text-success"
+                                                }`}
+                                            >
+                                                {p.is_enabled === 1
+                                                    ? "yes"
+                                                    : "no"}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div
+                                                className="btn-group"
+                                                role="group"
+                                                aria-label="Basic example"
+                                            >
                                                 <button
                                                     type="button"
                                                     className="btn btn-primary"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#productModal"
-                                                    onClick={() => editData(p)}
+                                                    onClick={() =>
+                                                        openModal(p, "edit")
+                                                    }
                                                 >
                                                     Edit
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className="btn btn-danger"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#productModal"
-                                                    onClick={() => delData(p)}
+                                                    onClick={() =>
+                                                        openModal(p, "delete")
+                                                    }
                                                 >
                                                     Del
                                                 </button>
-                                                {/* <button
-                                                    type="button"
-                                                    className="btn btn-primary"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#productModal"
-                                                    onClick={() =>
-                                                        showDetail(p.id)
-                                                    }
-                                                >
-                                                    show
-                                                </button> */}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                     <div
                         id="productModal"
@@ -398,7 +395,7 @@ function App() {
                                         id="productModalLabel"
                                         className="modal-title"
                                     >
-                                        <span>{`${actMethods[actType]}產品`}</span>
+                                        <span>{`${modalMap[modalType]}產品`}</span>
                                     </h5>
                                     <button
                                         type="button"
@@ -407,10 +404,10 @@ function App() {
                                         aria-label="Close"
                                     ></button>
                                 </div>
-                                {actType === 3 ? (
-                                    <div className="modal-body">
+                                <div className="modal-body">
+                                    {modalType === "delete" ? (
                                         <div className="row">
-                                            <div className="col-sm-4">
+                                            <div className="col">
                                                 刪除產品編號{" "}
                                                 <span className="text-danger">
                                                     {productForm.title
@@ -420,9 +417,7 @@ function App() {
                                                 嗎?
                                             </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="modal-body">
+                                    ) : (
                                         <div className="row">
                                             <div className="col-sm-4">
                                                 <div className="mb-2">
@@ -434,24 +429,111 @@ function App() {
                                                             輸入圖片網址
                                                         </label>
                                                         <input
+                                                            name="imageUrl"
                                                             type="text"
                                                             className="form-control"
                                                             placeholder="請輸入圖片連結"
-                                                            onChange={(e) => {
-                                                                setInputUrl(
-                                                                    e.target
-                                                                        .value
-                                                                );
-                                                            }}
+                                                            value={
+                                                                productForm.imageUrl
+                                                            }
+                                                            onChange={
+                                                                modalInputChange
+                                                            }
                                                         />
-                                                        {inputUrl}
                                                     </div>
+                                                    {productForm.imageUrl && (
+                                                        <img
+                                                            className="img-fluid"
+                                                            src={
+                                                                productForm.imageUrl
+                                                            }
+                                                            alt="主圖"
+                                                        />
+                                                    )}
                                                 </div>
-                                                <div className="d-flex justify-content-between">
-                                                    <button
-                                                        className="btn btn-outline-primary btn-sm d-block w-100 mx-1"
-                                                        onClick={concatUrls}
-                                                    >
+                                                <div>
+                                                    {
+                                                        productForm.imagesUrl
+                                                            .length
+                                                    }
+                                                    張圖
+                                                    <ul>
+                                                        {productForm.imagesUrl.map(
+                                                            (url, index) => (
+                                                                <li
+                                                                    key={index}
+                                                                    className="img-thumbnail"
+                                                                >
+                                                                    <input
+                                                                        type="text"
+                                                                        className="form-control mb-1"
+                                                                        placeholder={`圖片網址 ${
+                                                                            index +
+                                                                            1
+                                                                        }`}
+                                                                        value={
+                                                                            url
+                                                                        }
+                                                                        onChange={(
+                                                                            e
+                                                                        ) =>
+                                                                            doImageChange(
+                                                                                index,
+                                                                                e
+                                                                                    .target
+                                                                                    .value
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    {url && (
+                                                                        <img
+                                                                            src={
+                                                                                url
+                                                                            }
+                                                                            alt="副圖"
+                                                                        />
+                                                                    )}
+                                                                </li>
+                                                            )
+                                                        )}
+                                                        <div className="d-flex.justify-content-between">
+                                                            {productForm
+                                                                .imagesUrl
+                                                                .length < 5 &&
+                                                                productForm
+                                                                    .imagesUrl[
+                                                                    productForm
+                                                                        .imagesUrl
+                                                                        .length -
+                                                                        1
+                                                                ] !== "" && (
+                                                                    <button
+                                                                        className="btn btn-outline-primary btn-sm w-100 mx-1"
+                                                                        onClick={
+                                                                            addImage
+                                                                        }
+                                                                    >
+                                                                        新增圖片
+                                                                    </button>
+                                                                )}
+                                                            {productForm
+                                                                .imagesUrl
+                                                                .length >=
+                                                                1 && (
+                                                                <button
+                                                                    className="btn btn-outline-danger btn-sm w-100 mx-1"
+                                                                    onClick={
+                                                                        removeImage
+                                                                    }
+                                                                >
+                                                                    取消圖片
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </ul>
+                                                </div>
+                                                {/* <div className="d-flex justify-content-between">
+                                                    <button className="btn btn-outline-primary btn-sm d-block w-100 mx-1">
                                                         新增圖片
                                                     </button>
                                                     <button className="btn btn-outline-danger btn-sm d-block w-100 mx-1">
@@ -476,7 +558,7 @@ function App() {
                                                             );
                                                         }
                                                     )}
-                                                </ul>
+                                                </ul> */}
                                             </div>
                                             <div className="col-sm-8">
                                                 <div className="mb-3">
@@ -495,8 +577,8 @@ function App() {
                                                         value={
                                                             productForm.title
                                                         }
-                                                        onChange={(e) =>
-                                                            modalInputChange(e)
+                                                        onChange={
+                                                            modalInputChange
                                                         }
                                                     />
                                                     {productForm.title}
@@ -520,10 +602,8 @@ function App() {
                                                             value={
                                                                 productForm.category
                                                             }
-                                                            onChange={(e) =>
-                                                                modalInputChange(
-                                                                    e
-                                                                )
+                                                            onChange={
+                                                                modalInputChange
                                                             }
                                                         />
                                                     </div>
@@ -543,10 +623,8 @@ function App() {
                                                             value={
                                                                 productForm.unit
                                                             }
-                                                            onChange={(e) =>
-                                                                modalInputChange(
-                                                                    e
-                                                                )
+                                                            onChange={
+                                                                modalInputChange
                                                             }
                                                         />
                                                     </div>
@@ -570,10 +648,8 @@ function App() {
                                                             value={
                                                                 productForm.origin_price
                                                             }
-                                                            onChange={(e) =>
-                                                                modalInputChange(
-                                                                    e
-                                                                )
+                                                            onChange={
+                                                                modalInputChange
                                                             }
                                                         />
                                                     </div>
@@ -594,10 +670,8 @@ function App() {
                                                             value={
                                                                 productForm.price
                                                             }
-                                                            onChange={(e) =>
-                                                                modalInputChange(
-                                                                    e
-                                                                )
+                                                            onChange={
+                                                                modalInputChange
                                                             }
                                                         />
                                                     </div>
@@ -619,8 +693,8 @@ function App() {
                                                         value={
                                                             productForm.description
                                                         }
-                                                        onChange={(e) =>
-                                                            modalInputChange(e)
+                                                        onChange={
+                                                            modalInputChange
                                                         }
                                                     ></textarea>
                                                 </div>
@@ -639,8 +713,8 @@ function App() {
                                                         value={
                                                             productForm.content
                                                         }
-                                                        onChange={(e) =>
-                                                            modalInputChange(e)
+                                                        onChange={
+                                                            modalInputChange
                                                         }
                                                     ></textarea>
                                                 </div>
@@ -658,10 +732,8 @@ function App() {
                                                                 productForm.is_enabled ===
                                                                 1
                                                             }
-                                                            onChange={(e) =>
-                                                                modalInputChange(
-                                                                    e
-                                                                )
+                                                            onChange={
+                                                                modalInputChange
                                                             }
                                                         />
                                                         <label
@@ -674,22 +746,27 @@ function App() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                                 <div className="modal-footer d-flex justify-content-center">
                                     <button
                                         type="button"
                                         className="btn btn-outline-secondary px-5"
-                                        data-bs-dismiss="modal"
+                                        onClick={() => closeModal()}
                                     >
                                         取消
                                     </button>
                                     <button
                                         type="button"
-                                        className="btn btn-primary px-5"
+                                        className={`btn ${
+                                            modalType === "delete"
+                                                ? "btn-danger"
+                                                : "btn-primary"
+                                        } px-5`}
                                         onClick={submitModal}
                                     >
                                         確認
+                                        {modalType === "delete" ? "刪除" : ""}
                                     </button>
                                 </div>
                             </div>
